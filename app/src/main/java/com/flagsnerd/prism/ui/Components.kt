@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,9 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -58,14 +55,7 @@ import com.flagsnerd.prism.data.Store
 import com.flagsnerd.prism.data.Video
 import com.flagsnerd.prism.fmtTime
 
-/** Frosted-glass look: translucent white fill + hairline border. */
-fun Modifier.glass(shape: Shape, alpha: Float = 0.16f): Modifier = this
-    .clip(shape)
-    .background(
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = alpha + 0.06f), Color.White.copy(alpha = alpha * 0.6f))),
-        shape
-    )
-    .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
+// Modifier.glass / glassPanel / bounceClick live in Glass.kt
 
 @Composable
 fun GlassIcon(
@@ -77,7 +67,7 @@ fun GlassIcon(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier.size(size).glass(CircleShape).clickable(onClick = onClick),
+        modifier.bounceClick(onClick = onClick).size(size).glass(CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, desc, tint = Color.White, modifier = Modifier.size(iconSize))
@@ -133,8 +123,12 @@ fun ProgressLine(frac: Float, modifier: Modifier = Modifier) {
 fun VideoCard(v: Video, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val frac = Store.fraction(v)
     val watched = Store.watched(v)
-    Column(modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(20.dp))) {
+    val thumbShape = RoundedCornerShape(22.dp)
+    Column(modifier.bounceClick(onClick = onClick)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(thumbShape)
+                .border(1.dp, Color.White.copy(alpha = 0.10f), thumbShape)
+        ) {
             Thumb(v, Modifier.fillMaxSize())
             if (v.durationMs > 0) {
                 Chip(fmtTime(v.durationMs), Modifier.align(Alignment.BottomEnd).padding(8.dp))
@@ -175,11 +169,11 @@ fun VideoRow(v: Video, onClick: () -> Unit, label: String? = null) {
     val frac = Store.fraction(v)
     val watched = Store.watched(v)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)
+        Modifier.fillMaxWidth().bounceClick(onClick = onClick)
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))) {
+        Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp))) {
             Thumb(v, Modifier.fillMaxSize())
             if (frac > 0.02f && !watched) {
                 ProgressLine(frac, Modifier.align(Alignment.BottomCenter).fillMaxWidth())

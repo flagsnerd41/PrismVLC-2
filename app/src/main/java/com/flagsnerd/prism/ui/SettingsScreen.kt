@@ -2,7 +2,6 @@ package com.flagsnerd.prism.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,21 +20,33 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -45,11 +56,18 @@ import com.flagsnerd.prism.data.Store
 import com.flagsnerd.prism.update.Updater
 
 @Composable
-private fun Card(content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer).padding(18.dp)
-    ) { content() }
+private fun CardTitle(icon: ImageVector, title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(36.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+    }
 }
 
 @Composable
@@ -65,7 +83,10 @@ private fun SwitchRow(title: String, desc: String, checked: Boolean, onChange: (
 
 @Composable
 private fun Swatch(colors: List<Color>, label: String, selected: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick).padding(4.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.bounceClick(onClick = onClick).padding(4.dp)
+    ) {
         Box(
             Modifier.size(52.dp).clip(CircleShape)
                 .background(Brush.linearGradient(colors))
@@ -89,8 +110,8 @@ fun SettingsScreen(bottomPad: Dp, onInstallUpdate: () -> Unit) {
         item { ScreenHeader("Settings", "Make it yours") }
 
         item {
-            Card {
-                Text("Theme", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            GlassCard(Modifier.staggerIn(1, "set1")) {
+                CardTitle(Icons.Rounded.Palette, "Theme")
                 Spacer(Modifier.height(10.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     item {
@@ -110,18 +131,43 @@ fun SettingsScreen(bottomPad: Dp, onInstallUpdate: () -> Unit) {
         }
 
         item {
-            Card {
-                Text("Your name", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            var level by remember { mutableFloatStateOf(Store.glassLevel) }
+            GlassCard(Modifier.staggerIn(2, "set2")) {
+                CardTitle(Icons.Rounded.AutoAwesome, "Look and motion")
                 Spacer(Modifier.height(8.dp))
+                SwitchRow("Animated background", "Soft colour glow drifting behind the app", Store.aurora) { Store.aurora = it }
+                SwitchRow("Animations", "Springy presses, screen transitions, entrances", Store.animations) { Store.animations = it }
+                Text("Glass intensity", fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 10.dp))
+                Slider(
+                    value = level,
+                    onValueChange = { level = it },
+                    onValueChangeFinished = { Store.glassLevel = level },
+                    valueRange = 0.5f..1.6f
+                )
+                Box(
+                    Modifier.fillMaxWidth().height(56.dp).glass(RoundedCornerShape(20.dp), 0.12f, level),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Liquid glass preview", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+
+        item {
+            GlassCard(Modifier.staggerIn(3, "set3")) {
+                CardTitle(Icons.Rounded.Person, "Your name")
+                Spacer(Modifier.height(10.dp))
                 TextField(
                     value = Store.userName,
                     onValueChange = { Store.userName = it },
                     placeholder = { Text("Shown in the greeting") },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.10f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -129,8 +175,8 @@ fun SettingsScreen(bottomPad: Dp, onInstallUpdate: () -> Unit) {
         }
 
         item {
-            Card {
-                Text("Playback", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            GlassCard(Modifier.staggerIn(4, "set4")) {
+                CardTitle(Icons.Rounded.PlayCircle, "Playback")
                 Spacer(Modifier.height(6.dp))
                 SwitchRow("Play next episode", "Continue with the next episode automatically", Store.autoNext) { Store.autoNext = it }
                 SwitchRow("Open in landscape", "Rotate to landscape when a video starts", Store.autoLandscape) { Store.autoLandscape = it }
@@ -138,12 +184,12 @@ fun SettingsScreen(bottomPad: Dp, onInstallUpdate: () -> Unit) {
         }
 
         item {
-            Card {
-                Text("Updates", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            GlassCard(Modifier.staggerIn(5, "set5")) {
+                CardTitle(Icons.Rounded.SystemUpdate, "Updates")
                 Text(
                     "Version ${Updater.installedName(ctx)}",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
                 )
                 if (Updater.available != null) {
                     Button(onClick = onInstallUpdate) { Text("Download and install") }
@@ -163,13 +209,13 @@ fun SettingsScreen(bottomPad: Dp, onInstallUpdate: () -> Unit) {
         }
 
         item {
-            Card {
-                Text("About", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+            GlassCard(Modifier.staggerIn(6, "set6")) {
+                CardTitle(Icons.Rounded.Info, "About")
                 Text(
                     "Prism plays your videos with libVLC. Unofficial, not affiliated with VideoLAN.\n\n" +
                         "The Retro Blendy display font is a personal-use demo by Sron Studio; buy a licence before sharing the app.",
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

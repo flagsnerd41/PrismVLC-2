@@ -1,7 +1,7 @@
 package com.flagsnerd.prism.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +29,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,23 +99,24 @@ fun HomeScreen(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             ScreenHeader("Prism", greeting(Store.userName)) {
-                IconButton(onClick = onSearch) { Icon(Icons.Rounded.Search, "Search") }
+                GlassIcon(Icons.Rounded.Search, "Search", size = 44.dp, iconSize = 22.dp, onClick = onSearch)
             }
         }
 
         if (Updater.available != null) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(onClick = onUpdate).padding(16.dp),
+                    Modifier.fillMaxWidth()
+                        .bounceClick(onClick = onUpdate)
+                        .glass(RoundedCornerShape(24.dp), 0.14f)
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Rounded.SystemUpdate, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Rounded.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Update available", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("Tap to download and install", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                        Text("Update available", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Tap to download and install", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -124,7 +124,7 @@ fun HomeScreen(
 
         if (progress.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Hero(progress.first(), onPlay)
+                Hero(progress.first(), onPlay, Modifier.staggerIn(0, "hero"))
             }
         }
         if (progress.size > 1) {
@@ -140,8 +140,8 @@ fun HomeScreen(
 
         if (recent.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle("Recently added") }
-            items(recent, key = { it.id }) { v ->
-                VideoCard(v, { onPlay(v, false) })
+            itemsIndexed(recent, key = { _, v -> v.id }) { i, v ->
+                VideoCard(v, { onPlay(v, false) }, Modifier.staggerIn(i, v.id))
             }
         } else if (!loading) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -163,10 +163,15 @@ fun HomeScreen(
 }
 
 @Composable
-private fun Hero(v: Video, onPlay: (Video, Boolean) -> Unit) {
+private fun Hero(v: Video, onPlay: (Video, Boolean) -> Unit, modifier: Modifier = Modifier) {
     val left = ((v.durationMs - Store.position(v.id)) / 60000L).coerceAtLeast(1L)
     val shape = RoundedCornerShape(32.dp)
-    Box(Modifier.fillMaxWidth().height(280.dp).clip(shape).clickable { onPlay(v, false) }) {
+    Box(
+        modifier.fillMaxWidth().height(280.dp)
+            .bounceClick { onPlay(v, false) }
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+    ) {
         Thumb(v, Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().background(
@@ -201,8 +206,9 @@ private fun Hero(v: Video, onPlay: (Video, Boolean) -> Unit) {
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primary)
-                        .clickable { onPlay(v, false) }.padding(horizontal = 20.dp, vertical = 11.dp),
+                    Modifier.bounceClick { onPlay(v, false) }
+                        .clip(CircleShape).background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 20.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
@@ -211,7 +217,8 @@ private fun Hero(v: Video, onPlay: (Video, Boolean) -> Unit) {
                 }
                 Spacer(Modifier.width(10.dp))
                 Row(
-                    Modifier.glass(CircleShape).clickable { onPlay(v, true) }
+                    Modifier.bounceClick { onPlay(v, true) }
+                        .glass(CircleShape)
                         .padding(horizontal = 18.dp, vertical = 11.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

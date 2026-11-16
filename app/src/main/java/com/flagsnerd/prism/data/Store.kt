@@ -52,6 +52,21 @@ object Store {
         get() { track(); return p.getBoolean("auto_landscape", true) }
         set(v) { p.edit().putBoolean("auto_landscape", v).apply(); version++ }
 
+    /** Slowly drifting colour blobs behind the app. */
+    var aurora: Boolean
+        get() { track(); return p.getBoolean("aurora", true) }
+        set(v) { p.edit().putBoolean("aurora", v).apply(); version++ }
+
+    /** Springy presses, screen transitions, entrance animations. */
+    var animations: Boolean
+        get() { track(); return p.getBoolean("animations", true) }
+        set(v) { p.edit().putBoolean("animations", v).apply(); version++ }
+
+    /** 0.5 = subtle, 1 = default, 1.6 = very glassy. */
+    var glassLevel: Float
+        get() { track(); return p.getFloat("glass_level", 1f) }
+        set(v) { p.edit().putFloat("glass_level", v).apply(); version++ }
+
     var notifAsked: Boolean
         get() = p.getBoolean("notif_asked", false)
         set(v) { p.edit().putBoolean("notif_asked", v).apply() }
