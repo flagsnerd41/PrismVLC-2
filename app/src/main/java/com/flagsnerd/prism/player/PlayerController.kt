@@ -143,6 +143,8 @@ object PlayerController {
         seekTo(p.time + delta)
     }
 
+    // @JvmName avoids a JVM clash with the private setter generated for `var speed`
+    @JvmName("applySpeed")
     fun setSpeed(r: Float) {
         speed = r
         mp?.rate = r
