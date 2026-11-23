@@ -78,14 +78,14 @@ private fun BackHeader(title: String, subtitle: String?, onBack: () -> Unit) {
 @Composable
 fun SeriesListScreen(series: List<Series>, bottomPad: Dp, onOpen: (Series) -> Unit) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(160.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomPad),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        columns = GridCells.Adaptive(150.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = bottomPad),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            ScreenHeader("Series", "${series.size} shows")
+            ScreenHeader("Shows", "${series.size} shows")
         }
         if (series.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -97,29 +97,7 @@ fun SeriesListScreen(series: List<Series>, bottomPad: Dp, onOpen: (Series) -> Un
             }
         }
         items(series, key = { it.name }) { s ->
-            val watched = s.episodes.count { Store.watched(it) }
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(4f / 5f).clip(RoundedCornerShape(24.dp))
-                    .clickable { onOpen(s) }
-            ) {
-                Thumb(s.cover, Modifier.fillMaxSize())
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))
-                    )
-                )
-                Column(Modifier.align(Alignment.BottomStart).padding(14.dp)) {
-                    Text(
-                        s.name, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        "${s.episodes.size} episodes · $watched watched",
-                        color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
+            SeriesPoster(s, { onOpen(s) }, Modifier.fillMaxWidth())
         }
     }
 }
@@ -139,6 +117,8 @@ fun SeriesDetail(
     }
     val seasons = remember(s) { s.episodes.groupBy { it.season }.toSortedMap() }
     val resuming = Store.inProgress(target)
+    val cover by rememberCover(s.name, null, true)
+    val poster = cover
 
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomPad),
@@ -147,30 +127,41 @@ fun SeriesDetail(
         item { BackHeader(s.name, "${s.episodes.size} episodes", onBack) }
         item {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(28.dp))) {
-                Thumb(target, Modifier.fillMaxSize())
+                Thumb(target, Modifier.fillMaxSize(), large = true)
                 Box(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))
                     )
                 )
-                Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
-                    Text(
-                        "${target.code} · ${target.title}", color = Color.White, fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primary)
-                            .clickable { onPlay(target, false) }
-                            .padding(horizontal = 20.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
-                        Spacer(Modifier.width(6.dp))
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(18.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    if (poster != null) {
+                        Box(Modifier.width(78.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(14.dp))) {
+                            CoverImage(poster, target, Modifier.fillMaxSize())
+                        }
+                        Spacer(Modifier.width(14.dp))
+                    }
+                    Column {
                         Text(
-                            if (resuming) "Continue" else "Play",
-                            color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold
+                            "${target.code} · ${target.title}", color = Color.White, fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.primary)
+                                .clickable { onPlay(target, false) }
+                                .padding(horizontal = 20.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (resuming) "Continue" else "Play",
+                                color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -191,7 +182,7 @@ fun SeriesDetail(
 @Composable
 fun FoldersScreen(folders: List<Folder>, bottomPad: Dp, onOpen: (Folder) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottomPad),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = bottomPad),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
