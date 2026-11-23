@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -29,6 +30,12 @@ object PlayerController {
     private var lastSave = 0L
     private var queue: List<Video> = emptyList()
 
+    // Playback must start AFTER the video surface is attached, otherwise libVLC opens the
+    // stream with no video output and you get a black screen (or nothing at all).
+    private var pendingPlay = false
+    private var attempt = 0
+    private var startAt = 0L
+
     var current by mutableStateOf<Video?>(null)
         private set
     var isPlaying by mutableStateOf(false)
@@ -51,7 +58,9 @@ object PlayerController {
 
     private fun player(): MediaPlayer {
         mp?.let { return it }
-        val lib = LibVLC(app, arrayListOf("--no-drop-late-frames", "--no-skip-frames"))
+        // Default options: no "--no-drop-late-frames" / "--no-skip-frames", they make video
+        // stall on hardware decoders that cannot keep up.
+        val lib = LibVLC(app)
         libVLC = lib
         val p = MediaPlayer(lib)
         p.setEventListener(MediaPlayer.EventListener { e -> onEvent(e) })
@@ -61,13 +70,19 @@ object PlayerController {
 
     private fun onEvent(e: MediaPlayer.Event) {
         when (e.type) {
-            MediaPlayer.Event.Playing -> isPlaying = true
+            MediaPlayer.Event.Playing -> {
+                isPlaying = true
+                pendingPlay = false
+            }
             MediaPlayer.Event.Paused -> {
                 isPlaying = false
                 saveProgress(true)
             }
             MediaPlayer.Event.Stopped -> isPlaying = false
-            MediaPlayer.Event.EncounteredError -> isPlaying = false
+            MediaPlayer.Event.EncounteredError -> {
+                isPlaying = false
+                main.post { onError() }
+            }
             MediaPlayer.Event.EndReached -> main.post { ended() }
             MediaPlayer.Event.LengthChanged -> lengthMs = e.lengthChanged
             MediaPlayer.Event.TimeChanged -> {
@@ -81,42 +96,89 @@ object PlayerController {
         }
     }
 
+    /** Retry with software decoding / a different way of opening the file before giving up. */
+    private fun onError() {
+        val v = current ?: return
+        if (attempt < 2) {
+            attempt++
+            startMedia(v)
+        } else {
+            Toast.makeText(app, "Couldn't play this video", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun closeFd() {
         try { pfd?.close() } catch (e: Exception) { }
         pfd = null
     }
 
-    fun play(v: Video, q: List<Video> = listOf(v), fromStart: Boolean = false) {
+    private fun viewsAttached(): Boolean =
+        try { mp?.vlcVout?.areViewsAttached() == true } catch (e: Exception) { false }
+
+    fun play(
+        v: Video,
+        q: List<Video> = listOf(v),
+        fromStart: Boolean = false,
+        openPlayer: Boolean = true,
+    ) {
         saveProgress(true)
-        val p = player()
-        val lib = libVLC!!
-        closeFd()
+        player()
         queue = q
         current = v
         timeMs = 0L
         lengthMs = v.durationMs
-        val media: Media = try {
-            val fd = app.contentResolver.openFileDescriptor(v.uri, "r")
-            if (fd != null) {
-                pfd = fd
-                Media(lib, fd.fileDescriptor)
-            } else {
+        if (openPlayer) showPlayer = true
+        attempt = 0
+        pendingPlay = false
+        val saved = Store.position(v.id)
+        startAt = if (fromStart || Store.watched(v)) 0L else saved
+        startMedia(v)
+    }
+
+    /**
+     * attempt 0: file descriptor, hardware decoding allowed
+     * attempt 1: file descriptor, software decoding
+     * attempt 2: content Uri, software decoding
+     */
+    private fun startMedia(v: Video) {
+        val p = player()
+        val lib = libVLC ?: return
+        closeFd()
+        val media: Media = if (attempt <= 1) {
+            try {
+                val fd = app.contentResolver.openFileDescriptor(v.uri, "r")
+                if (fd != null) {
+                    pfd = fd
+                    Media(lib, fd.fileDescriptor)
+                } else {
+                    Media(lib, v.uri)
+                }
+            } catch (e: Exception) {
                 Media(lib, v.uri)
             }
-        } catch (e: Exception) {
+        } else {
             Media(lib, v.uri)
         }
-        val start = if (fromStart) 0L else Store.position(v.id)
-        if (start > 10_000L && !Store.watched(v)) media.addOption(":start-time=${start / 1000}")
+        if (attempt >= 1) media.setHWDecoderEnabled(false, false)
+        if (startAt > 10_000L) media.addOption(":start-time=${startAt / 1000}")
         p.media = media
         media.release()
         p.rate = speed
-        p.play()
+        // wait for the surface when the full player is about to show
+        if (viewsAttached() || !showPlayer) p.play() else pendingPlay = true
     }
 
     fun attach(layout: VLCVideoLayout) {
-        player().attachViews(layout, null, true, true)
+        val p = player()
+        try {
+            if (p.vlcVout.areViewsAttached()) p.detachViews()
+            p.attachViews(layout, null, true, true)
+        } catch (e: Exception) { }
         applyFill()
+        if (pendingPlay) {
+            pendingPlay = false
+            main.post { mp?.play() }
+        }
     }
 
     fun detach() {
@@ -191,7 +253,7 @@ object PlayerController {
         val c = current ?: return
         Store.save(c.id, if (lengthMs > 0) lengthMs else c.durationMs, true)
         val n = nextVideo()
-        if (n != null && Store.autoNext) play(n, queue, true) else isPlaying = false
+        if (n != null && Store.autoNext) play(n, queue, true, openPlayer = false) else isPlaying = false
     }
 
     fun saveProgress(notify: Boolean) {
@@ -203,6 +265,7 @@ object PlayerController {
     /** Stop for good (mini player X). */
     fun stop() {
         saveProgress(true)
+        pendingPlay = false
         mp?.stop()
         closeFd()
         current = null

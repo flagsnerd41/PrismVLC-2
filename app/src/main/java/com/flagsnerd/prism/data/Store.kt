@@ -67,6 +67,11 @@ object Store {
         get() { track(); return p.getFloat("glass_level", 1f) }
         set(v) { p.edit().putFloat("glass_level", v).apply(); version++ }
 
+    /** Download movie / show posters from the internet. */
+    var covers: Boolean
+        get() { track(); return p.getBoolean("covers", true) }
+        set(v) { p.edit().putBoolean("covers", v).apply(); version++ }
+
     var notifAsked: Boolean
         get() = p.getBoolean("notif_asked", false)
         set(v) { p.edit().putBoolean("notif_asked", v).apply() }
@@ -74,4 +79,18 @@ object Store {
     var notifiedBuild: Long
         get() = p.getLong("notified_build", 0L)
         set(v) { p.edit().putLong("notified_build", v).apply() }
+
+    // ---- cover cache (not snapshot-tracked) ----
+    fun cacheGet(key: String): String? = p.getString(key, null)
+
+    fun cachePut(key: String, value: String) {
+        p.edit().putString(key, value).apply()
+    }
+
+    fun clearCovers() {
+        val e = p.edit()
+        p.all.keys.filter { it.startsWith("cv:") }.forEach { e.remove(it) }
+        e.apply()
+        version++
+    }
 }

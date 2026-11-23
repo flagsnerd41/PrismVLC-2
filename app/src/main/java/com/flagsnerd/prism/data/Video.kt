@@ -21,6 +21,12 @@ data class Video(
     val episode: Int get() = parsed.episode
     val isEpisode: Boolean get() = parsed.series != null
 
+    /** Release year found in the file name (movies), if any. */
+    val year: Int? get() = Parser.year(fileName)
+
+    /** Title without the year and anything after it, used to look up posters online. */
+    val searchTitle: String get() = Parser.searchTitle(title)
+
     val code: String
         get() = String.format(Locale.ROOT, "S%02dE%02d", season, episode)
 
@@ -43,6 +49,20 @@ object Parser {
     private val groups = Regex("""\([^)]*\)|\[[^\]]*\]""")
     private val spaces = Regex("\\s+")
     private val trailingYear = Regex("""\s*\(\d{4}\)\s*$""")
+
+    // a plausible year that is not part of a resolution like 1920x1080
+    private val yearRegex = Regex("""(?<!\d)((?:19|20)\d{2})(?![\dxXpPiI])""")
+    private val yearInTitle = Regex("""[\s(\[]((?:19|20)\d{2})(?![\dxXpPiI])""")
+
+    fun year(file: String): Int? =
+        yearRegex.findAll(file).mapNotNull { it.groupValues[1].toIntOrNull() }
+            .filter { it in 1900..2035 }.lastOrNull()
+
+    fun searchTitle(title: String): String {
+        val m = yearInTitle.find(title) ?: return title
+        val cut = title.substring(0, m.range.first).trim().trim('(', '[', '-', '–', ' ')
+        return cut.ifBlank { title }
+    }
 
     fun parse(file: String): Parsed {
         val dot = file.lastIndexOf('.')
