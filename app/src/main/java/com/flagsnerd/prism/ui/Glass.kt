@@ -1,5 +1,6 @@
 package com.flagsnerd.prism.ui
 
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -25,24 +26,70 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.flagsnerd.prism.data.Store
 
 // ---------------------------------------------------------------------------
-// Liquid glass: translucent body + soft top sheen + a specular rim that is
-// bright at the top-left / bottom-right edges and fades in between.
+// Liquid glass: a REAL backdrop blur of whatever is scrolling behind the bar,
+// plus a translucent tint, a soft top sheen and a specular rim that is bright
+// at the top-left / bottom-right edges and fades in between.
+//
+// How the blur works: PrismRoot records the app content (aurora + screens)
+// into a GraphicsLayer (see [glassSource]) and provides it through
+// [LocalGlassSource]. Every [glassPanel] draws that same layer again behind
+// itself, shifted to line up with the screen, with a RenderEffect blur on it.
+// Needs Android 12+ (API 31); older phones get the frosted solid fallback.
 // ---------------------------------------------------------------------------
+
+val LocalGlassSource = staticCompositionLocalOf<GraphicsLayer?> { null }
+
+/** Marks the content that glass panels blur. Put it on the full-screen box behind the bars. */
+fun Modifier.glassSource(layer: GraphicsLayer): Modifier = this.drawWithContent {
+    layer.record { this@drawWithContent.drawContent() }
+    drawLayer(layer)
+}
+
+@Composable
+private fun Modifier.blurBehind(source: GraphicsLayer, shape: Shape, radius: Dp): Modifier {
+    val layer = rememberGraphicsLayer()
+    var pos by remember { mutableStateOf(Offset.Zero) }
+    return this
+        .onGloballyPositioned { pos = it.positionInRoot() }
+        .clip(shape)
+        .drawBehind {
+            val r = radius.toPx()
+            layer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            layer.record {
+                translate(-pos.x, -pos.y) { drawLayer(source) }
+            }
+            drawLayer(layer)
+        }
+}
 
 private fun rimBrush(k: Float): Brush = Brush.linearGradient(
     listOf(
@@ -67,17 +114,21 @@ fun Modifier.glass(shape: Shape, alpha: Float = 0.16f, level: Float = Store.glas
         .border(1.dp, rimBrush(level), shape)
 }
 
-/** Heavier glass for bars that sit over scrolling content (nav bar, mini player). */
+/** Heavier glass for bars that sit over scrolling content (nav bar, mini player): live blur on Android 12+. */
 @Composable
 fun Modifier.glassPanel(shape: Shape): Modifier {
     val k = Store.glassLevel
-    val base = MaterialTheme.colorScheme.surfaceContainerHigh
-    val body = (0.88f - (k - 1f) * 0.30f).coerceIn(0.60f, 0.95f)
-    return this
-        .clip(shape)
-        .background(base.copy(alpha = body), shape)
+    val cs = MaterialTheme.colorScheme
+    val source = LocalGlassSource.current
+    val live = source != null && Build.VERSION.SDK_INT >= 31
+    val body = if (live) (0.46f - (k - 1f) * 0.22f).coerceIn(0.22f, 0.62f)
+    else (0.88f - (k - 1f) * 0.30f).coerceIn(0.60f, 0.95f)
+    val base = if (live && source != null) this.blurBehind(source, shape, 26.dp) else this.clip(shape)
+    return base
+        .background(cs.surfaceContainerHigh.copy(alpha = body), shape)
+        .background(cs.primary.copy(alpha = if (live) 0.06f else 0f), shape)
         .background(
-            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f * k), Color.Transparent)),
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f * k), Color.Transparent)),
             shape
         )
         .border(1.dp, rimBrush(k), shape)

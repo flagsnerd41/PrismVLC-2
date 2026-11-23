@@ -88,14 +88,15 @@ fun Chip(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** Video frame used as a thumbnail. [large] = sharper frame for big hero banners. */
 @Composable
-fun Thumb(v: Video, modifier: Modifier = Modifier) {
+fun Thumb(v: Video, modifier: Modifier = Modifier, large: Boolean = false) {
     val ctx = LocalContext.current
-    val req = remember(v.id) {
+    val req = remember(v.id, large) {
         ImageRequest.Builder(ctx)
             .data(v.uri)
             .videoFrameMillis(maxOf(1000L, v.durationMs / 8))
-            .size(480, 270)
+            .size(if (large) 1080 else 480, if (large) 1080 else 270)
             .crossfade(true)
             .build()
     }
